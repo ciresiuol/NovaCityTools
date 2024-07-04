@@ -25,6 +25,8 @@ local stopVehicleSpawning = true
 local vehicleSpawning = true
 local crowdSpawning = true
 
+local hasResetOrForced = false
+
 local settings =
 {
 	Current = {
@@ -142,16 +144,29 @@ function ShowNotificationMessage(message)
     Game.GetBlackboardSystem():Get(GetAllBlackboardDefs().UI_Notifications):SetVariant(GetAllBlackboardDefs().UI_Notifications.OnscreenMessage, ToVariant(text), true)
 end
 
-registerForEvent("onUpdate", function()
+registerForEvent("onUpdate", function(delta)
+    Cron.Update(delta)
+    if hasResetOrForced == true then
+        local resetorforcedtimer = Cron.After(0.5, function()
+            hasResetOrForced = false
+        end)
+    end
     if not Game.GetPlayer() or Game.GetSystemRequestsHandler():IsGamePaused() then return end
     local newWeatherState = tostring(Game.GetWeatherSystem():GetWeatherState().name.value)
     if newWeatherState ~= currentWeatherState then
         currentWeatherState = newWeatherState
-        -- Use the mapping to get the localized name
         local localizedState = weatherStateNames[currentWeatherState]
         local messageText = "Weather changed to " .. (localizedState or currentWeatherState)
-        ShowWarningMessage(messageText)
-        ShowNotificationMessage(messageText)
+        if hasResetOrForced == false then
+            if resetorforcedtimer then
+                Cron.Halt(resetorforcedtimer)
+                resetorforcedtimer = nil
+            end
+            ShowWarningMessage(messageText)
+            ShowNotificationMessage(messageText)
+        end
+    else
+        return
     end
 end)
 
@@ -182,10 +197,10 @@ function DrawButtons()
 						local enableDLSSDPT = state[4]  -- Get the DLSSDSeparateParticleColor flag
 						if category == i then
 							if ImGui.Button(localization, 140, 30) then
+							        hasResetOrForced = true
 								Game.GetWeatherSystem():SetWeather(weatherState, settings.transitionTime, 0)
 								settings.Current.weatherState = weatherState
 								Game.GetPlayer():SetWarningMessage("Locked weather state to " .. localization:lower() .. "!")
-					
 								-- Set the DLSSDSeparateParticleColor option based on the flag
 								GameOptions.SetBool("Rendering", "DLSSDSeparateParticleColor", enableDLSSDPT)
 								toggleDLSSDPT = enableDLSSDPT  -- Update the checkbox status
@@ -210,6 +225,7 @@ function DrawButtons()
 
                 if ImGui.Button('Reset Weather', 290, 30) then
 					Game.GetWeatherSystem():ResetWeather(true)
+					hasResetOrForced = true
 					settings.Current.weatherState = 'None'
 					settings.Current.nativeWeather = 1
 					Game.GetPlayer():SetWarningMessage("Weather reset to default cycles. \n\nWeather states will progress automatically.")
