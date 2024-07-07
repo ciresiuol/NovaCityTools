@@ -169,7 +169,7 @@ function ShowWarningMessage(message)
 end
 
 function ShowNotificationMessage(message)
-    if settings2.Current.warningMessages == false then return end
+    if settings2.Current.notificationMessages == false then return end
     local text = SimpleScreenMessage.new()
     text.duration = 4.0
     text.message = message
